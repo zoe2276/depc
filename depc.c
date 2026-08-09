@@ -38,7 +38,7 @@ char** getDeps() {
     FILE* fptr = readPkg();
 
     int depCount = getDepCount();
-    char** deps = malloc(depCount);
+    char** deps = malloc(depCount + 1);
 
     char sToCheck[256];
     while (fgets(sToCheck, sizeof(sToCheck), fptr)) {
@@ -54,23 +54,27 @@ char** getDeps() {
 
                 // parse dep name
                 char* depName = calloc(256, sizeof(char));
-                char* cursor = strstr(dep, "\"") + 1;
-                if (*cursor != NULL) {
+                char* cursor = strstr(dep, "\"");
+                if (cursor != NULL) {
+                    cursor++;
                     while (*cursor != '"' && *cursor != '\0') {
-                        printf("cursor: %c\n", *cursor);
                         depName[strlen(depName)] = *cursor;
+                        printf("depName: %s\n", depName);
                         cursor++;
                     }
-                    printf("deps[%d] ", i);
+                    printf("deps[%d]\t", i);
                     deps[i] = malloc(strlen(depName) + 1);
-                    printf("strcpy ");
+                    printf("strcpy\t");
                     strcpy(deps[i], depName);
+                    printf("inc\t");
                     // depName should realloc and clean up
                     i++;
+                    printf("next iter\n");
                     if (i > 5) {
-                    //    break;
+                        break;
                     }
                 }
+                printf("post cond\n");
             }
             printf("before outer break");
             break;
@@ -81,6 +85,9 @@ char** getDeps() {
 }
 
 int main() {
+    printf("str:\t%s\nstrlen:\t%s\n", "test string", strlen("test string"));
+    return 0;
+
     char** deps = getDeps();
 
     printf("dep count: %d", getDepCount());
