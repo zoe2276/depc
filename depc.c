@@ -2,9 +2,13 @@
 #include <stdlib.h>
 #include <string.h>
 
+struct depsSt {
+    char** data;
+    size_t count;
+};
+
 FILE* readPkg() {
-    FILE* fptr;
-    fptr = fopen("./package.json", "r");
+    FILE* fptr = fopen("./package.json", "r");
     if (fptr == NULL) {
         printf("No package.json found in the current directory. Make sure you are in the project root and try again.");
     }
@@ -14,80 +18,90 @@ FILE* readPkg() {
 int getDepCount() {
     FILE* fptr = readPkg();
 
-    char sToCheck[256];
+    char lineCursor[256];
     int deps = 0;
-    while (fgets(sToCheck, sizeof(sToCheck), fptr)) {
-        if (strstr(sToCheck, "\"dependencies\":") != NULL) {
-            // we have found the dependency line
-            char dep[256];
-            while (fgets(dep, sizeof(dep), fptr)) {
-                if (strstr(dep, "}") != NULL) {
-                    // end of deps block
-                    break;
-                }
-                deps++;
+    int depth = 0; // track how many levels of nesting we are in relative to deps line
+    while (fgets(lineCursor, sizeof(lineCursor), fptr)) {
+        if (depth == 0) {
+            if (strstr(lineCursor, "\"dependencies\":") != NULL) {
+                // we have found the dependency line
+                depth++;
             }
-            break;
+        } else {
+            if (strstr(lineCursor, "{") != NULL) depth++; // start of new nesting level
+            if (strstr(lineCursor, "}") != NULL) depth--; // end of current nesting level
+            if (depth > 0) deps++;
         }
     }
+
     fclose(fptr);
     return deps;
 }
 
-char** getDeps() {
+struct depsSt getDeps() {
+    int depCount = getDepCount();
     FILE* fptr = readPkg();
 
-    int depCount = getDepCount();
     char** deps = malloc(depCount + 1);
 
-    char sToCheck[256];
-    while (fgets(sToCheck, sizeof(sToCheck), fptr)) {
-        if (strstr(sToCheck, "\"dependencies\":") != NULL) {
-            // we have found the dependency line
-            char dep[256];
-            int i = 0;
-            while (fgets(dep, sizeof(dep), fptr)) {
-                if (strstr(dep, "}") != NULL) {
-                    // end of deps block
-                    break;
-                }
-
+    char lineCursor[256];
+    int depIdx = 0;
+    int depth = 0; // track how many levels of nesting we are in relative to deps line
+    while (fgets(lineCursor, sizeof(lineCursor), fptr)) {
+        if (depth == 0) {
+            if (strstr(lineCursor, "\"dependencies\":") != NULL) {
+                // we have found the dependency line
+                depth++;
+            }
+        } else {
+            if (strstr(lineCursor, "{") != NULL) depth++; // start of new nesting level
+            if (strstr(lineCursor, "}") != NULL) depth--; // end of current nesting level
+            if (depth > 0) {
                 // parse dep name
                 char* depName = calloc(256, sizeof(char));
-                char* cursor = strstr(dep, "\"");
+                char* cursor = strstr(lineCursor, "\"");
                 if (cursor != NULL) {
                     cursor++;
+                    int dci = 0;
                     while (*cursor != '"' && *cursor != '\0') {
-                        depName[strlen(depName)] = *cursor++;
-                        // printf("depName: %s\n", depName);
+                        depName[dci++] = *cursor++;
                     }
-                    deps[i] = malloc(strlen(depName) + 1);
-                    strcpy(deps[i], depName);
-                    printf("deps[%d]: \t%s\n", i, deps[i]);
-                    // depName should be clean up in next iter by calloc
-                    i++;
+                    deps[depIdx] = malloc(strlen(depName) + 1);
+                    strcpy(deps[depIdx], depName);
+                    depIdx++;
                 }
-            }
-            printf("before outer break");
-            break;
+                free(depName);
+            } 
         }
     }
-    fclose(fptr);
-    return deps;
+    // fclose(fptr);
+    struct depsSt data = { deps, depCount };
+    return data;
+}
+
+char** scanFile(char* path, char** deps) {
+    FILE* fptr = fopen(path, "r");
+
+    char lineCursor[256];
+    while (fgets(lineCursor, sizeof(lineCursor), fptr)) {
+        if (strstr(lineCursor, "import") != NULL) {
+
+        }
+    }
+
+    free(fptr);
 }
 
 int main() {
-    char** deps = getDeps();
+    struct depsSt deps = getDeps();
 
-    printf("dep count: %d", getDepCount());
-
-    for (int i = 0; i < getDepCount(); i++) {
-        printf("dep %d: %s\n", i + 1, deps[i]);
-        free(deps[i]);
+    // free deps
+    for (int i = 0; i < deps.count; i++) {
+        printf("dep %d: %s\n", i + 1, deps.data[i]);
+        free(deps.data[i]);
     }
-
+    free(deps.data);
+    
     printf("Done.");
-
-    free(deps);
     return 0;
 }
