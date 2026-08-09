@@ -58,23 +58,15 @@ char** getDeps() {
                 if (cursor != NULL) {
                     cursor++;
                     while (*cursor != '"' && *cursor != '\0') {
-                        depName[strlen(depName)] = *cursor;
-                        printf("depName: %s\n", depName);
-                        cursor++;
+                        depName[strlen(depName)] = *cursor++;
+                        // printf("depName: %s\n", depName);
                     }
-                    printf("deps[%d]\t", i);
                     deps[i] = malloc(strlen(depName) + 1);
-                    printf("strcpy\t");
                     strcpy(deps[i], depName);
-                    printf("inc\t");
-                    // depName should realloc and clean up
+                    printf("deps[%d]: \t%s\n", i, deps[i]);
+                    // depName should be clean up in next iter by calloc
                     i++;
-                    printf("next iter\n");
-                    if (i > 5) {
-                        break;
-                    }
                 }
-                printf("post cond\n");
             }
             printf("before outer break");
             break;
@@ -85,9 +77,6 @@ char** getDeps() {
 }
 
 int main() {
-    printf("str:\t%s\nstrlen:\t%s\n", "test string", strlen("test string"));
-    return 0;
-
     char** deps = getDeps();
 
     printf("dep count: %d", getDepCount());
