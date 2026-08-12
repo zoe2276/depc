@@ -2,89 +2,69 @@
 #include <stdlib.h>
 #include <string.h>
 
-struct depsSt {
+typedef struct dependencies {
     char** data;
     size_t count;
-};
+} deps_t;
 
-FILE* readPkg() {
-    FILE* fptr = fopen("./package.json", "r");
-    if (fptr == NULL) {
-        printf("No package.json found in the current directory. Make sure you are in the project root and try again.");
-    }
-    return fptr;
-}
-
-int getDepCount() {
-    FILE* fptr = readPkg();
-
-    char lineCursor[256];
+int count_dependencies(FILE* fptr) {
+    char line_cursor[256];
     int deps = 0;
-    int depth = 0; // track how many levels of nesting we are in relative to deps line
-    while (fgets(lineCursor, sizeof(lineCursor), fptr)) {
-        if (depth == 0) {
-            if (strstr(lineCursor, "\"dependencies\":") != NULL) {
-                // we have found the dependency line
-                depth++;
+    bool in_dependency_block = false;
+    while (fgets(line_cursor, sizeof(line_cursor), fptr)) {
+        if (!in_dependency_block) {
+            if (strstr(line_cursor, "\"dependencies\":") != NULL) {
+                in_dependency_block = true;
             }
         } else {
-            if (strstr(lineCursor, "{") != NULL) depth++; // start of new nesting level
-            if (strstr(lineCursor, "}") != NULL) depth--; // end of current nesting level
-            if (depth > 0) deps++;
+            if (strstr(line_cursor, "}") != NULL) break;
+            deps++;
         }
     }
 
-    fclose(fptr);
+    rewind(fptr);
     return deps;
 }
 
-struct depsSt getDeps() {
-    int depCount = getDepCount();
-    FILE* fptr = readPkg();
+deps_t get_deps(FILE* fptr) {
+    int dep_count = count_dependencies(fptr);
 
-    char** deps = malloc(depCount + 1);
+    char** deps = malloc((sizeof(char*) * dep_count));
 
-    char lineCursor[256];
-    int depIdx = 0;
-    int depth = 0; // track how many levels of nesting we are in relative to deps line
-    while (fgets(lineCursor, sizeof(lineCursor), fptr)) {
-        if (depth == 0) {
-            if (strstr(lineCursor, "\"dependencies\":") != NULL) {
-                // we have found the dependency line
-                depth++;
+    char line_cursor[256];
+    int dep_idx = 0;
+    bool in_dependency_block = false;
+    while (fgets(line_cursor, sizeof(line_cursor), fptr)) {
+        if (!in_dependency_block) {
+            if (strstr(line_cursor, "\"dependencies\":") != NULL) {
+                in_dependency_block = true;
             }
         } else {
-            if (strstr(lineCursor, "{") != NULL) depth++; // start of new nesting level
-            if (strstr(lineCursor, "}") != NULL) depth--; // end of current nesting level
-            if (depth > 0) {
+            if (strchr(line_cursor, '}') == NULL) {
                 // parse dep name
-                char* depName = calloc(256, sizeof(char));
-                char* cursor = strstr(lineCursor, "\"");
+                char* cursor = strchr(line_cursor, '"');
                 if (cursor != NULL) {
-                    cursor++;
-                    int dci = 0;
-                    while (*cursor != '"' && *cursor != '\0') {
-                        depName[dci++] = *cursor++;
-                    }
-                    deps[depIdx] = malloc(strlen(depName) + 1);
-                    strcpy(deps[depIdx], depName);
-                    depIdx++;
+                    char* end_idx = strchr(++cursor, '"');
+
+                    deps[dep_idx] = malloc((end_idx - cursor) + 1);
+                    memcpy(deps[dep_idx], cursor, (end_idx - cursor));
+                    dep_idx++;
                 }
-                free(depName);
-            } 
+            } else {
+                break;
+            }
         }
     }
-    // fclose(fptr);
-    struct depsSt data = { deps, depCount };
+    deps_t data = { deps, dep_count };
     return data;
 }
 
-char** scanFile(char* path, char** deps) {
+char** scan_file(char* path, deps_t deps) {
     FILE* fptr = fopen(path, "r");
 
-    char lineCursor[256];
-    while (fgets(lineCursor, sizeof(lineCursor), fptr)) {
-        if (strstr(lineCursor, "import") != NULL) {
+    char line_cursor[256];
+    while (fgets(line_cursor, sizeof(line_cursor), fptr)) {
+        if (strstr(line_cursor, "import") != NULL) {
 
         }
     }
@@ -93,15 +73,22 @@ char** scanFile(char* path, char** deps) {
 }
 
 int main() {
-    struct depsSt deps = getDeps();
+    FILE* fptr = fopen("./package.json", "r");
+    if (fptr == NULL) {
+        printf("No package.json found in the current directory. Make sure you are in the project root and try again.");
+        return 1;
+    }
 
+    deps_t deps = get_deps(fptr);
+    free(fptr);
+
+    printf("deps: %i\n", deps.count);
     // free deps
     for (int i = 0; i < deps.count; i++) {
         printf("dep %d: %s\n", i + 1, deps.data[i]);
         free(deps.data[i]);
     }
     free(deps.data);
-    
-    printf("Done.");
+    printf("\e[0;34mDone.\e[0m");
     return 0;
 }
